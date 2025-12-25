@@ -82,21 +82,23 @@ def _message_init(syncer: DataSyncClient):
 
 if __name__ == "__main__":
     global_syncer = DataSyncClient(".env", "config.json")
-    try:
-        _message_init(global_syncer)
-        scheduler = BlockingScheduler()
+    # global_syncer.cinema_client.get_financial_data(['C24', 'month', '2025-11'])
+    global_syncer._upload_current_year_data('C24', compose_table_name(global_syncer.config.get_name('C24')), upload_by_quarter=True)
+    # try:
+    #     _message_init(global_syncer)
+    #     scheduler = BlockingScheduler()
 
-        scheduler.add_job(job_per_day, 'cron', hour=8, minute=15, args=[global_syncer])
-        scheduler.add_job(
-            job_per_hour,
-            'cron',
-            hour='0,8-23',
-            minute=0,
-            args=[global_syncer]
-        )
-        scheduler.start()
-    except Exception as e:
-        os._exit(1)
+    #     scheduler.add_job(job_per_day, 'cron', hour=8, minute=15, args=[global_syncer])
+    #     scheduler.add_job(
+    #         job_per_hour,
+    #         'cron',
+    #         hour='0,8-23',
+    #         minute=0,
+    #         args=[global_syncer]
+    #     )
+    #     scheduler.start()
+    # except Exception as e:
+    #     os._exit(1)
 
         
 

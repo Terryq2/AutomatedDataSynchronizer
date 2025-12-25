@@ -16,7 +16,7 @@ from . import FINANCIAL_DATA_TYPE_MAP
 from . import exceptions
 from . import sha1prng
 
-DEBUG = False
+DEBUG = True
 
 def download_urls(encrypted_urls: list[str],
                   financial_category: str,

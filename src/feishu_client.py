@@ -87,6 +87,7 @@ class FeishuClient:
         }
         try:
             response = make_request("GET", url, headers=headers, params=params)
+            print(response)
             obj_token = response.json()['data']['node']['obj_token']
             logger.info(f"Successfully obtained obj_token: {obj_token}")
             return obj_token
