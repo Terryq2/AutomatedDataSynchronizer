@@ -1,32 +1,104 @@
+"""
+Main entry point
+"""
+from datetime import datetime, date, time, timedelta
+import json
+import os
+
+from apscheduler.schedulers.blocking import BlockingScheduler
 from src.driver import DataSyncClient
-from pprint import pprint
-import base64
+from utility.helpers import compose_table_name
 from src.config import FinancialQueries
 
+def job_per_day(syncer: DataSyncClient):
+    _job_for_others(syncer)
+    _job_for_cinema_ticket_daily(syncer)
+    _message_after_job(syncer)
+
+def job_per_hour(syncer: DataSyncClient):
+    _job_for_cinema_tickets_hourly(syncer)
+
+def _job_for_cinema_tickets_hourly(syncer: DataSyncClient):
+    today = date.today().strftime("%Y-%m-%d")
+    dt_5am = datetime.combine(date.today(), time(6, 0, 0))
+    table_name = syncer.config.get_name('C01')
+
+    list_of_ids = syncer.lark_client.get_table_records_id_after_date(table_name, dt_5am, syncer._get_primary_timestamp_column_name('C01'))
+    syncer.lark_client.delete_records_by_id(table_name, list_of_ids)
+    query_data_today = FinancialQueries('C01', 'day', today)
+    syncer.upload_data(query_data_today, table_name)
+    _message_after_tickets_job(syncer)
+
+def _job_for_cinema_ticket_daily(syncer: DataSyncClient):
+    dt_5am = datetime.combine(date.today() - timedelta(days=14), time(6, 0, 0))
+
+    table_name = syncer.config.get_name('C01')
+    list_of_ids = syncer.lark_client.get_table_records_id_before_date(table_name, dt_5am, syncer._get_primary_timestamp_column_name('C01'))
+    syncer.lark_client.delete_records_by_id(table_name, list_of_ids)
+
+def _job_for_others(syncer: DataSyncClient):
+    syncer.sync_all_yesterday()
+    syncer.sync_screening_data()
+
+
+def _message_after_tickets_job(syncer: DataSyncClient):
+    current_time = datetime.now()
+    timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
+
+    message = json.dumps({
+        "text": (f'{timestamp}' f' <b>SYNCED TICKETS DATA</b>')
+    })
+
+    syncer.lark_client.send_message_to_chat_group(
+        message,
+        syncer.lark_client.get_chat_group_id_by_name('服务器状态')
+    )
+
+def _message_after_job(syncer: DataSyncClient):
+    current_time = datetime.now()
+    timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
+
+    message = json.dumps({
+        "text": (f'{timestamp}' f' <b>SYNCED OTHERS</b>')
+    })
+
+    syncer.lark_client.send_message_to_chat_group(
+        message,
+        syncer.lark_client.get_chat_group_id_by_name('服务器状态')
+    )
+
+def _message_init(syncer: DataSyncClient):
+    current_time = datetime.now()
+    timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
+
+    message = json.dumps({
+        "text": (f'{timestamp}' f' <b>SERVER INITIALIZING</b>')
+    })
+
+    syncer.lark_client.send_message_to_chat_group(
+        message,
+        syncer.lark_client.get_chat_group_id_by_name('服务器状态')
+    )
 
 if __name__ == "__main__":
-    test = DataSyncClient(".env", "config.json")
-    # test.sync_most_recent_data('C01', "影票销售明细")
-    t = test.lark_client.get_table_records_id_at_head_date("影票销售明细",  "销售时间")
-    # test._upload_most_recent_data('C01', '影票销售明细')
-    # test.lark_client.delete_table("影票销售明细")
+    global_syncer = DataSyncClient(".env", "config.json")
+    # global_syncer.cinema_client.get_financial_data(['C24', 'month', '2025-11'])
+    global_syncer._upload_current_year_data('C24', compose_table_name(global_syncer.config.get_name('C24')), upload_by_quarter=True)
+    # try:
+    #     _message_init(global_syncer)
+    #     scheduler = BlockingScheduler()
 
+    #     scheduler.add_job(job_per_day, 'cron', hour=8, minute=15, args=[global_syncer])
+    #     scheduler.add_job(
+    #         job_per_hour,
+    #         'cron',
+    #         hour='0,8-23',
+    #         minute=0,
+    #         args=[global_syncer]
+    #     )
+    #     scheduler.start()
+    # except Exception as e:
+    #     os._exit(1)
 
-    # test.download_data(FinancialQueries("C01", 'day', '2025-07-26'))
-    # t = test.lark_client.get_table_records_id_at_date("影票销售明细", '2025-07-14', '销售时间')
-    test.lark_client.delete_records_by_id("影票销售明细", t)
-    # test._upload_most_recent_data("C01", "影票销售明细")
-    # list_of_id = test.lark_client.get_table_records_id_before_some_day("影票销售明细", some_day=13, time_stamp_column_name="销售时间")
-    # test.lark_client.delete_records("影票销售明细", list_of_id)
-    # with open("output.txt", "w", encoding="utf-8") as f:
-    #     pprint(data, stream=f)
-
-
-    # b64_string = 'cGFnZVRva2VuOjM2'
-    # decoded_bytes = base64.b64decode(b64_string)
-    # decoded_str = decoded_bytes.decode('utf-8')
-
-    # print(decoded_str)
-
-    # test.sync_most_recent_data('C01', '影票销售明细')
+        
 

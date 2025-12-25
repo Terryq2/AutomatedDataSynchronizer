@@ -1,21 +1,22 @@
 """"
 Helper functions
 """
-from datetime import datetime
+from datetime import datetime, date
 import hashlib
 import hmac
 import os
-import base64
 import time
+from typing import Any
 
 import httpx
 import polars
 from tqdm import tqdm
 
-from . import exceptions
 from . import FINANCIAL_DATA_TYPE_MAP
+from . import exceptions
 from . import sha1prng
 
+DEBUG = True
 
 def download_urls(encrypted_urls: list[str],
                   financial_category: str,
@@ -50,14 +51,16 @@ def download_urls(encrypted_urls: list[str],
     os.makedirs(f"{FINANCIAL_DATA_TYPE_MAP[financial_category]}", exist_ok = True)
     for secret_url in tqdm(encrypted_urls, ncols=70, unit="url"):
         try:
-            data_response = httpx.get(decrypter.decode(secret_url))
-        except httpx.HTTPError:
+            data_response = httpx.get(decrypter.decode(secret_url), timeout=60.0)
+        except httpx.HTTPError as htttp_error:
             clear_files(file_path_stack)
-            raise exceptions.DataFetchException() from httpx.HTTPError
+            raise exceptions.DataFetchException() from htttp_error
 
         utf8_content = data_response.content.decode('gbk').encode('utf-8')
 
-        filename = f"{FINANCIAL_DATA_TYPE_MAP[financial_category]}/{FINANCIAL_DATA_TYPE_MAP[financial_category]}_({search_date})_part{file_id}.csv"
+        filename = (f"{FINANCIAL_DATA_TYPE_MAP[financial_category]}/"
+                    f"{FINANCIAL_DATA_TYPE_MAP[financial_category]}"
+                    f"_({search_date})_part{file_id}.csv")
 
         try:
             with open(filename, "wb") as f:
@@ -87,25 +90,6 @@ def clear_files(files_to_clear: list[str]):
     while files_to_clear:
         file_name = files_to_clear.pop()
         os.remove(file_name)
-
-def query_data(api_name: str, query_parameters: dict[str, str], app_key: str) -> str:
-    """
-    使用 HTTP GET 请求从指定 API 查询数据。
-
-    通过构造请求 URL 和参数，使用 httpx 客户端发送请求，并返回响应内容。
-
-    Args:
-        api_name (str): API 的名称，用于拼接请求 URL。
-        query_parameters (dict[str, str]): 请求的查询参数字典。
-
-    Returns:
-        str: API 返回的响应内容（通常是字符串格式）。
-    """
-    base_url: str = "https://gw.open.yuekeyun.com/openapi/param2/1/alibaba.dme.lark"
-    with httpx.Client() as client:
-        response = client.get(f"{base_url}/{api_name}/{app_key}?",
-                            params=query_parameters, timeout=30.0)
-    return response
 
 def get_signature(api_name: str,
                   paramaters: dict[str, str],
@@ -140,8 +124,8 @@ def get_signature(api_name: str,
 
 def combine_data_files(file_paths: list[str],
                        financial_category: str,
-                       search_date: str, 
-                       remove_files_after_finish: bool):
+                       search_date: str,
+                       remove_files_after_finish: bool) -> str | None:
     """
     将多个财务数据 CSV 文件合并为一个输出文件，跳过注释行和重复的表头。
     
@@ -162,14 +146,16 @@ def combine_data_files(file_paths: list[str],
         # 输出文件将写入 商品订单数据/商品订单数据.csv
     """
     if not file_paths:
-        return
+        return None
 
-    output_path = f"{FINANCIAL_DATA_TYPE_MAP[financial_category]}/{FINANCIAL_DATA_TYPE_MAP[financial_category]}_({search_date}).csv"
+    output_path = (f"{FINANCIAL_DATA_TYPE_MAP[financial_category]}/"
+                      f"{FINANCIAL_DATA_TYPE_MAP[financial_category]}"
+                      f"_({search_date}).csv")
 
     def get_filtered_lines(path):
         with open(path, "r", encoding="utf-8") as f:
             lines = f.read().splitlines()
-            return [line for line in lines if not line.startswith("#")]
+            return [line for line in lines if (not line.startswith("#"))]
 
     with open(output_path, "wb") as out_file:
         # Process the first file
@@ -188,9 +174,8 @@ def combine_data_files(file_paths: list[str],
         if remove_files_after_finish:
             for path in file_paths:
                 os.remove(path)
-    
+
     return output_path
-    
 
 def read_csv(path: str):
     """
@@ -238,7 +223,7 @@ def read_csv(path: str):
     df = polars.read_csv(path, truncate_ragged_lines=True, infer_schema=False)
     data_dict = df.to_dicts()
     total_rows = len(data_dict)
-    
+
     current_entry_ptr = 0
     list_of_records = []
     while current_entry_ptr < total_rows:
@@ -251,22 +236,48 @@ def read_csv(path: str):
         ]
         list_of_records.append(records)
         current_entry_ptr += max_rows_per_post
-            
+
     return list_of_records
 
 
-def merge_csv_files(folder_path: str) -> polars.DataFrame:
+def merge_csv_files(file_names: list[str]) -> polars.DataFrame:
+    """合并指定文件夹中的所有 CSV 文件到一个 Polars DataFrame，并清空原文件夹。
+
+    遍历文件夹中的所有 CSV 文件，将它们读取为 Polars DataFrame 并进行垂直拼接（纵向合并）。
+    合并完成后，删除原文件夹中的所有文件（包括非 CSV 文件）。
+
+    Args:
+        folder_path (str): 包含 CSV 文件的文件夹路径。路径需存在且可读。
+
+    Returns:
+        polars.DataFrame: 合并后的 DataFrame，包含所有 CSV 文件的数据。
+            如果文件夹中没有 CSV 文件，返回一个空的 DataFrame。
+
+    Raises:
+        FileNotFoundError: 如果 `folder_path` 不存在或不可访问。
+        polars.PolarsError: 如果 CSV 文件读取或合并失败（如格式不一致）。
+
+    Notes:
+        1. 合并时会自动截断不规则行（`truncate_ragged_lines=True`）。
+        2. 不自动推断模式（`infer_schema=False`），以提高读取速度。
+        3. 原文件夹中的所有文件（包括非 CSV）均会被删除，请谨慎使用！
+
+    Example:
+        >>> # 假设文件夹 `/data` 包含 a.csv 和 b.csv
+        >>> df = merge_csv_files("/data")
+        >>> df.shape  # 输出合并后的行数和列数
+        (200, 5)
+        >>> # 原文件夹 `/data` 将被清空
+    """
     dfs = []
-    for filename in os.listdir(folder_path):
-        if filename.endswith(".csv"):
-            filepath = os.path.join(folder_path, filename)
-            df = polars.read_csv(filepath, truncate_ragged_lines=True, infer_schema=False)
-            dfs.append(df)
-    for filename in os.listdir(folder_path):
-        os.remove(os.path.join(folder_path, filename))
+    for filename in file_names:
+        df = polars.read_csv(filename, truncate_ragged_lines=True, infer_schema=False)
+        dfs.append(df)
+    for filename in file_names:
+        os.remove(filename)
     return polars.concat(dfs, how="vertical")
 
-def order_by_time(path: str, timestamp_col: int = 0):
+def order_by_time(path: str, accuracy: str, timestamp_col: int = 0, secondary_timestamp_col: int = None):
     """
     读取 CSV 文件，按时间列排序并覆盖原文件。
 
@@ -297,18 +308,41 @@ def order_by_time(path: str, timestamp_col: int = 0):
     """
 
     df = polars.read_csv(path, truncate_ragged_lines=True, infer_schema=False)
-    df = df.with_columns([
-        polars.col(df.columns[timestamp_col]).str.strptime(polars.Datetime, "%Y-%m-%d %H:%M:%S", strict=False)
-    ])
-    df = df.sort(df.columns[timestamp_col], descending = False)
-    df = df.with_columns([
-        polars.col(df.columns[timestamp_col]).dt.strftime("%Y-%m-%d %H:%M:%S")
-    ])
+    if accuracy == 'day':
+        df = df.with_columns([
+            polars.col(df.columns[timestamp_col]).str.strptime(polars.Datetime,
+                                                               "%Y-%m-%d", 
+                                                               strict=False)
+        ])
+    else:
+        df = df.with_columns([
+            polars.col(df.columns[timestamp_col]).str.strptime(polars.Datetime,
+                                                            "%Y-%m-%d %H:%M:%S", 
+                                                            strict=False)
+        ])
+        
+    if secondary_timestamp_col is not None:
+        df = df.sort(
+            [df.columns[timestamp_col], df.columns[secondary_timestamp_col]], 
+            descending=[False, False]  # first ascending, second descending
+        )
+    else:
+        df = df.sort(df.columns[timestamp_col], descending = False)
+        
+    if accuracy == 'day':
+        df = df.with_columns([
+            polars.col(df.columns[timestamp_col]).dt.strftime("%Y-%m-%d")
+        ])
+    else:
+        df = df.with_columns([
+            polars.col(df.columns[timestamp_col]).dt.strftime("%Y-%m-%d %H:%M:%S")
+        ])
+    
     os.remove(path)
     df.write_csv(path, quote_style="always")
 
 
-def get_past_days_this_month():
+def get_past_days_this_month() -> list[str]:
     """
     返回当月中已经过去的所有日期（不包括今天），格式为 'YYYY-MM-DD' 的字符串列表。
 
@@ -331,14 +365,80 @@ def get_timestamp() -> int:
     """
     return int(time.time() * 1000)
 
-def find_matching_table(json_data, table_name):
-    # Search for the matching table
-    for table in json_data.get("data", {}).get("items", []):
-        if table.get("name") == table_name:
-            return table.get("table_id")
-        
-def encode_string_to_base64(text: str) -> str:
-    """Encode a string to base64"""
-    # Convert string to bytes, then encode to base64, then back to string
-    encoded_bytes = base64.b64encode(text.encode('utf-8'))
-    return encoded_bytes.decode('utf-8')
+def find_matching_table(json_data: dict[Any, Any] , table_name: str | None) -> str | None:
+    """根据表名在嵌套的 JSON 数据中查找并返回对应的 `table_id`。
+
+    在嵌套字典结构（假设表数据位于 `data["items"]` 下）中搜索与指定 `table_name` 匹配的表，
+    若找到则返回其 `table_id`。
+
+    Args:
+        json_data (dict[Any, Any]): 包含表数据的嵌套字典。预期结构为：
+            {
+                "data": {
+                    "items": [
+                        {"name": str, "table_id": str},
+                        ...
+                    ]
+                }
+            }
+            如果结构无效（如缺失关键字段），则返回 `None`。
+        table_name (Optional[str]): 要查找的表名。若为 `None`，则直接返回 `None`。
+
+    Returns:
+        Optional[str]: 匹配到的 `table_id`（字符串），以下情况返回 `None`：
+            - `table_name` 为 `None`。
+            - 未找到匹配的表。
+            - `json_data` 结构无效（如缺少 `data` 或 `items`）。
+
+    Raises:
+        TypeError: 如果 `json_data["data"]["items"]` 不是列表（尽管防御性编程已避免此情况）。
+
+    Example:
+        >>> json_data = {
+        ...     "data": {
+        ...         "items": [
+        ...             {"name": "users", "table_id": "t1"},
+        ...             {"name": "orders", "table_id": "t2"}
+        ...         ]
+        ...     }
+        ... }
+        >>> find_matching_table(json_data, "users")
+        't1'
+        >>> find_matching_table(json_data, "products")
+        None
+    """
+    if table_name is None:
+        return None
+
+    try:
+        for table in json_data['data']['items']:
+            if table.get("name") == table_name:
+                return table.get("table_id")
+    except KeyError as e:
+        raise KeyError("Json data is malformed or does not contain a data field") from e
+
+def make_request(
+    method: str,
+    url: str,
+    headers: dict[str, str] | None = None,
+    json_data: dict[Any, Any] | None = None,
+    params: dict[Any, Any] | None = None,
+    timeout: float = 30.0
+) -> httpx.Response:
+    """统一的HTTP请求方法"""
+    with httpx.Client() as client:
+        response = client.request(
+            method=method,
+            url=url,
+            headers=headers,
+            json=json_data,
+            params=params,
+            timeout=timeout
+        )
+        if DEBUG:
+            print(response.content)
+        response.raise_for_status()
+    return response
+
+def compose_table_name(name: str):
+    return f'{name} {date.today().year}'
