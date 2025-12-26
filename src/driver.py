@@ -145,7 +145,7 @@ class DataSyncClient:
         if by_quarter:
             current_time = datetime.now()
             current_quarter = (current_time.month - 1) // 3 + 1
-            table_name = f'{table_name} Q{current_quarter} {current_time.year}' 
+            table_name = f'{table_name} Q{current_quarter} {current_time.year}'
 
         try:
             # Get wiki token if not provided
@@ -444,7 +444,6 @@ class DataSyncClient:
         self.upload_data(FinancialQueries('C04', 'day', yesterday), compose_table_name(self.config.get_name('C04')))
         self.upload_data(FinancialQueries('C05', 'day', yesterday), compose_table_name(self.config.get_name('C05')))
         self.upload_data(FinancialQueries('C06', 'day', yesterday), self.config.get_name('C06'), by_quarter=True)
-        self.upload_data(FinancialQueries('C07', 'day', yesterday), self.config.get_name('C07'), by_quarter=True)
         self.upload_data(FinancialQueries('C24', 'day', yesterday), self.config.get_name('C24'), by_quarter=True)
 
     def sync_screening_data(self):

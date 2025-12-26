@@ -13,7 +13,15 @@ from src.config import FinancialQueries
 def job_per_day(syncer: DataSyncClient):
     _job_for_others(syncer)
     _job_for_cinema_ticket_daily(syncer)
+    _job_monday(syncer)
     _message_after_job(syncer)
+    
+def _job_monday(syncer: DataSyncClient):
+    if date.today().weekday() == 0:
+        yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+        syncer.upload_data(FinancialQueries('C07', 'day', yesterday), compose_table_name(syncer.config.get_name('C07')))
+    else:
+        pass
 
 def job_per_hour(syncer: DataSyncClient):
     _job_for_cinema_tickets_hourly(syncer)
@@ -46,7 +54,7 @@ def _message_after_tickets_job(syncer: DataSyncClient):
     timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
 
     message = json.dumps({
-        "text": (f'{timestamp}' f' <b>SYNCED TICKETS DATA</b>')
+        "text": (f'{timestamp}' f' <b>影票数据同步成功</b>')
     })
 
     syncer.lark_client.send_message_to_chat_group(
@@ -59,7 +67,7 @@ def _message_after_job(syncer: DataSyncClient):
     timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
 
     message = json.dumps({
-        "text": (f'{timestamp}' f' <b>SYNCED OTHERS</b>')
+        "text": (f'{timestamp}' f' <b>其他数据同步成功</b>')
     })
 
     syncer.lark_client.send_message_to_chat_group(
@@ -72,7 +80,7 @@ def _message_init(syncer: DataSyncClient):
     timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
 
     message = json.dumps({
-        "text": (f'{timestamp}' f' <b>SERVER INITIALIZING</b>')
+        "text": (f'{timestamp}' f' <b>服务器启动中</b>')
     })
 
     syncer.lark_client.send_message_to_chat_group(
