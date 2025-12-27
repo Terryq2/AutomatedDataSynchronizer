@@ -11,17 +11,22 @@ from utility.helpers import compose_table_name
 from src.config import FinancialQueries
 
 def job_per_day(syncer: DataSyncClient):
-    _job_for_others(syncer)
+    successes = _job_for_others(syncer)
     _job_for_cinema_ticket_daily(syncer)
     _job_monday(syncer)
-    _message_after_job(syncer)
+    _message_after_job(syncer, successes)
     
 def _job_monday(syncer: DataSyncClient):
     if date.today().weekday() == 0:
         yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
         syncer.upload_data(FinancialQueries('C07', 'day', yesterday), compose_table_name(syncer.config.get_name('C07')))
+    elif date.today().day == 1:
+        yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+        syncer.upload_data(FinancialQueries('C07', 'day', yesterday), compose_table_name(syncer.config.get_name('C07')))
+    else:
+        pass
 
-    if date.today().month == 0:
+
 
 def job_per_hour(syncer: DataSyncClient):
     _job_for_cinema_tickets_hourly(syncer)
@@ -45,8 +50,9 @@ def _job_for_cinema_ticket_daily(syncer: DataSyncClient):
     syncer.lark_client.delete_records_by_id(table_name, list_of_ids)
 
 def _job_for_others(syncer: DataSyncClient):
-    syncer.sync_all_yesterday()
-    syncer.sync_screening_data()
+    successes = syncer.sync_all_yesterday()
+    successes.append((compose_table_name('C18'), syncer.sync_screening_data()))
+    return successes
 
 
 def _message_after_tickets_job(syncer: DataSyncClient):
@@ -62,13 +68,20 @@ def _message_after_tickets_job(syncer: DataSyncClient):
         syncer.lark_client.get_chat_group_id_by_name('服务器状态')
     )
 
-def _message_after_job(syncer: DataSyncClient):
+def _message_after_job(syncer: DataSyncClient, successes: list):
     current_time = datetime.now()
     timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S")[:-3]
 
-    message = json.dumps({
-        "text": (f'{timestamp}' f' <b>其他数据同步成功</b>')
-    })
+    lines = [
+        f"  {type} ({ok})"
+        for type, ok in successes
+    ]
+
+    message = (
+        f"{timestamp}\n"
+        "<b>其他数据同步成功</b>\n"
+        + "\n".join(lines)
+    )
 
     syncer.lark_client.send_message_to_chat_group(
         message,

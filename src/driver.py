@@ -117,7 +117,7 @@ class DataSyncClient:
         table_name: str,
         wiki_obj_token: Optional[str] = None,
         by_quarter: bool = False
-    ) -> None:
+    ) -> bool:
         """从Yuekeyun API获取财务数据并上传至飞书。
 
         Args:
@@ -179,6 +179,8 @@ class DataSyncClient:
 
             logger.info(f"Successfully synced financial data to table '{table_name}'")
 
+            return True
+        
         except Exception as e:
             logger.error(f"Failed to sync financial data: {e}")
             raise
@@ -438,15 +440,24 @@ class DataSyncClient:
             None
         """
         yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+        successes = []
 
-        self.upload_data(FinancialQueries('C02', 'day', yesterday), compose_table_name(self.config.get_name('C02')))
-        self.upload_data(FinancialQueries('C03', 'day', yesterday), compose_table_name(self.config.get_name('C03')))
-        self.upload_data(FinancialQueries('C04', 'day', yesterday), compose_table_name(self.config.get_name('C04')))
-        self.upload_data(FinancialQueries('C05', 'day', yesterday), compose_table_name(self.config.get_name('C05')))
-        self.upload_data(FinancialQueries('C06', 'day', yesterday), self.config.get_name('C06'), by_quarter=True)
-        self.upload_data(FinancialQueries('C24', 'day', yesterday), self.config.get_name('C24'), by_quarter=True)
+        if (self.upload_data(FinancialQueries('C02', 'day', yesterday), compose_table_name(self.config.get_name('C02')))):
+            successes.append((f'{self.config.get_name('C02')}', '成功'))
+        if (self.upload_data(FinancialQueries('C03', 'day', yesterday), compose_table_name(self.config.get_name('C03')))):
+            successes.append((f'{self.config.get_name('C03')}', '成功'))
+        if (self.upload_data(FinancialQueries('C04', 'day', yesterday), compose_table_name(self.config.get_name('C04')))):
+            successes.append((f'{self.config.get_name('C04')}', '成功'))
+        if (self.upload_data(FinancialQueries('C05', 'day', yesterday), compose_table_name(self.config.get_name('C05')))):
+            successes.append((f'{self.config.get_name('C05')}', '成功'))
+        if (self.upload_data(FinancialQueries('C06', 'day', yesterday), compose_table_name(self.config.get_name('C06')))):
+            successes.append((f'{self.config.get_name('C06')}', '成功'))
+        if (self.upload_data(FinancialQueries('C24', 'day', yesterday), compose_table_name(self.config.get_name('C24')))):
+            successes.append((f'{self.config.get_name('C24')}', '成功'))
 
-    def sync_screening_data(self):
+        return successes
+
+    def sync_screening_data(self) -> bool:
         today = date.today()
         yesterday = (date.today()- timedelta(days=1)).strftime("%Y-%m-%d")
         list_of_days = []
@@ -467,3 +478,5 @@ class DataSyncClient:
         self.lark_client.delete_records_by_id(compose_table_name(self.config.get_name('C18')), list_of_ids_to_delete)
         self.upload_data(FinancialQueries('C18', 'day', yesterday), compose_table_name(self.config.get_name('C18')))
         self.upload_future_data('C18', compose_table_name(self.config.get_name('C18')))
+
+        return true
