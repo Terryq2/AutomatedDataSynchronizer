@@ -54,7 +54,7 @@ def _message_after_tickets_job(syncer: DataSyncClient):
     timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S")[:-3]
 
     message = json.dumps({
-        "text": (f'{timestamp}' f' <b>影票数据同步成功</b> \u2713')
+        "text": (f'{timestamp}' f' <b>影票数据同步成功</b>')
     })
 
     syncer.lark_client.send_message_to_chat_group(
@@ -67,7 +67,7 @@ def _message_after_job(syncer: DataSyncClient):
     timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S")[:-3]
 
     message = json.dumps({
-        "text": (f'{timestamp}' f' <b>其他数据同步成功</b> \u2713')
+        "text": (f'{timestamp}' f' <b>其他数据同步成功</b>')
     })
 
     syncer.lark_client.send_message_to_chat_group(
@@ -80,7 +80,7 @@ def _message_init(syncer: DataSyncClient):
     timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S")[:-3]
 
     message = json.dumps({
-        "text": (f'{timestamp}' f' <b>服务器启动中</b> \u2713')
+        "text": (f'{timestamp}' f' <b>服务器启动中</b>')
     })
 
     syncer.lark_client.send_message_to_chat_group(
@@ -90,21 +90,21 @@ def _message_init(syncer: DataSyncClient):
 
 if __name__ == "__main__":
     global_syncer = DataSyncClient(".env", "config.json")
-    # try:
-    #     _message_init(global_syncer)
-    #     scheduler = BlockingScheduler()
+    try:
+        _message_init(global_syncer)
+        scheduler = BlockingScheduler()
 
-    #     scheduler.add_job(job_per_day, 'cron', hour=8, minute=15, args=[global_syncer])
-    #     scheduler.add_job(
-    #         job_per_hour,
-    #         'cron',
-    #         hour='0,8-23',
-    #         minute=0,
-    #         args=[global_syncer]
-    #     )
-    #     scheduler.start()
-    # except Exception as e:
-    #     os._exit(1)
+        scheduler.add_job(job_per_day, 'cron', hour=8, minute=15, args=[global_syncer])
+        scheduler.add_job(
+            job_per_hour,
+            'cron',
+            hour='0,8-23',
+            minute=0,
+            args=[global_syncer]
+        )
+        scheduler.start()
+    except Exception as e:
+        os._exit(1)
 
         
 
