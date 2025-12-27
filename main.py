@@ -54,7 +54,7 @@ def _message_after_tickets_job(syncer: DataSyncClient):
     timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S")[:-3]
 
     message = json.dumps({
-        "text": (f'{timestamp}' f' <b>影票数据同步成功</b>')
+        "text": (f'{timestamp}' f' <b>影票数据同步成功</b> \u2713')
     })
 
     syncer.lark_client.send_message_to_chat_group(
@@ -67,7 +67,7 @@ def _message_after_job(syncer: DataSyncClient):
     timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S")[:-3]
 
     message = json.dumps({
-        "text": (f'{timestamp}' f' <b>其他数据同步成功</b>')
+        "text": (f'{timestamp}' f' <b>其他数据同步成功</b> \u2713')
     })
 
     syncer.lark_client.send_message_to_chat_group(
@@ -80,7 +80,7 @@ def _message_init(syncer: DataSyncClient):
     timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S")[:-3]
 
     message = json.dumps({
-        "text": (f'{timestamp}' f' <b>服务器启动中</b>')
+        "text": (f'{timestamp}' f' <b>服务器启动中</b> \u2713')
     })
 
     syncer.lark_client.send_message_to_chat_group(
