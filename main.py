@@ -20,8 +20,8 @@ def _job_monday(syncer: DataSyncClient):
     if date.today().weekday() == 0:
         yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
         syncer.upload_data(FinancialQueries('C07', 'day', yesterday), compose_table_name(syncer.config.get_name('C07')))
-    else:
-        pass
+
+    if date.today().month == 0:
 
 def job_per_hour(syncer: DataSyncClient):
     _job_for_cinema_tickets_hourly(syncer)
