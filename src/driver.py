@@ -479,4 +479,4 @@ class DataSyncClient:
         self.upload_data(FinancialQueries('C18', 'day', yesterday), compose_table_name(self.config.get_name('C18')))
         self.upload_future_data('C18', compose_table_name(self.config.get_name('C18')))
 
-        return true
+        return True
