@@ -26,8 +26,6 @@ def _job_monday(syncer: DataSyncClient):
     else:
         pass
 
-
-
 def job_per_hour(syncer: DataSyncClient):
     _job_for_cinema_tickets_hourly(syncer)
 
@@ -51,9 +49,9 @@ def _job_for_cinema_ticket_daily(syncer: DataSyncClient):
 
 def _job_for_others(syncer: DataSyncClient):
     successes = syncer.sync_all_yesterday()
-    successes.append((compose_table_name('C18'), syncer.sync_screening_data()))
+    if syncer.sync_screening_data():
+        successes.append((compose_table_name('C18'), '成功'))
     return successes
-
 
 def _message_after_tickets_job(syncer: DataSyncClient):
     current_time = datetime.now()
@@ -77,10 +75,15 @@ def _message_after_job(syncer: DataSyncClient, successes: list):
         for type, ok in successes
     ]
 
-    message = (
-        f"{timestamp}\n"
+    message = json.dumps({
+        "text": (f"{timestamp}\n"
         "<b>其他数据同步成功</b>\n"
-        + "\n".join(lines)
+        + "\n".join(lines))}
+    )
+
+    syncer.lark_client.send_message_to_chat_group(
+        message,
+        syncer.lark_client.get_chat_group_id_by_name('服务器状态')
     )
 
     syncer.lark_client.send_message_to_chat_group(
@@ -103,23 +106,21 @@ def _message_init(syncer: DataSyncClient):
 
 if __name__ == "__main__":
     global_syncer = DataSyncClient(".env", "config.json")
-    global_syncer._upload_current_year_data('C02', compose_table_name(global_syncer.config.get_name('C02')))
-    
-    # try:
-    #     _message_init(global_syncer)
-    #     scheduler = BlockingScheduler()
+    try:
+        _message_init(global_syncer)
+        scheduler = BlockingScheduler()
 
-    #     scheduler.add_job(job_per_day, 'cron', hour=8, minute=15, args=[global_syncer])
-    #     scheduler.add_job(
-    #         job_per_hour,
-    #         'cron',
-    #         hour='0,8-23',
-    #         minute=0,
-    #         args=[global_syncer]
-    #     )
-    #     scheduler.start()
-    # except Exception as e:
-    #     os._exit(1)
+        scheduler.add_job(job_per_day, 'cron', hour=8, minute=15, args=[global_syncer])
+        scheduler.add_job(
+            job_per_hour,
+            'cron',
+            hour='0,8-23',
+            minute=0,
+            args=[global_syncer]
+        )
+        scheduler.start()
+    except Exception as e:
+        os._exit(1)
 
         
 
