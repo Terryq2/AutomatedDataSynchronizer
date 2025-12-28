@@ -71,7 +71,7 @@ def _message_after_job(syncer: DataSyncClient, successes: list):
     timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S")[:-3]
 
     lines = [
-        f"  {type} ({ok})"
+        f"{type} ({ok})"
         for type, ok in successes
     ]
 
