@@ -440,22 +440,13 @@ class DataSyncClient:
             None
         """
         yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
-        successes = []
 
-        if (self.upload_data(FinancialQueries('C02', 'day', yesterday), compose_table_name(self.config.get_name('C02')))):
-            successes.append((f'{self.config.get_name('C02')}', '成功'))
-        if (self.upload_data(FinancialQueries('C03', 'day', yesterday), compose_table_name(self.config.get_name('C03')))):
-            successes.append((f'{self.config.get_name('C03')}', '成功'))
-        if (self.upload_data(FinancialQueries('C04', 'day', yesterday), compose_table_name(self.config.get_name('C04')))):
-            successes.append((f'{self.config.get_name('C04')}', '成功'))
-        if (self.upload_data(FinancialQueries('C05', 'day', yesterday), compose_table_name(self.config.get_name('C05')))):
-            successes.append((f'{self.config.get_name('C05')}', '成功'))
-        if (self.upload_data(FinancialQueries('C06', 'day', yesterday), compose_table_name(self.config.get_name('C06')))):
-            successes.append((f'{self.config.get_name('C06')}', '成功'))
-        if (self.upload_data(FinancialQueries('C24', 'day', yesterday), compose_table_name(self.config.get_name('C24')))):
-            successes.append((f'{self.config.get_name('C24')}', '成功'))
-
-        return successes
+        self.upload_data(FinancialQueries('C02', 'day', yesterday), compose_table_name(self.config.get_name('C02')))
+        self.upload_data(FinancialQueries('C03', 'day', yesterday), compose_table_name(self.config.get_name('C03')))
+        self.upload_data(FinancialQueries('C04', 'day', yesterday), compose_table_name(self.config.get_name('C04')))
+        self.upload_data(FinancialQueries('C05', 'day', yesterday), compose_table_name(self.config.get_name('C05')))
+        self.upload_data(FinancialQueries('C06', 'day', yesterday), compose_table_name(self.config.get_name('C06')))
+        self.upload_data(FinancialQueries('C24', 'day', yesterday), compose_table_name(self.config.get_name('C24')))
 
     def sync_screening_data(self) -> bool:
         today = date.today()
