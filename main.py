@@ -104,7 +104,6 @@ def _message_init(syncer: DataSyncClient):
 
 if __name__ == "__main__":
     global_syncer = DataSyncClient(".env", "config.json")
-    global_syncer.sync_screening_data()
     try:
         _message_init(global_syncer)
         scheduler = BlockingScheduler()
