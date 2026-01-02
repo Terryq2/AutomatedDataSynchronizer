@@ -12,10 +12,16 @@ from src.config import FinancialQueries
 
 def job_per_day(syncer: DataSyncClient):
     _job_for_others(syncer)
+
+def job_for_cinema_tickets(syncer: DataSyncClient):
     _job_for_cinema_ticket_daily(syncer)
-    _job_monday(syncer)
-    _message_after_job(syncer)
     
+def job_monday(syncer: DataSyncClient):
+    _job_monday(syncer)
+
+def message_after_job(syncer: DataSyncClient):
+    _message_after_job(syncer)
+
 def _job_monday(syncer: DataSyncClient):
     if date.today().weekday() == 0:
         yesterday = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -98,11 +104,14 @@ def _message_init(syncer: DataSyncClient):
 
 if __name__ == "__main__":
     global_syncer = DataSyncClient(".env", "config.json")
+    global_syncer.sync_screening_data()
     try:
         _message_init(global_syncer)
         scheduler = BlockingScheduler()
-
         scheduler.add_job(job_per_day, 'cron', hour=8, minute=15, args=[global_syncer])
+        scheduler.add_job(job_for_cinema_tickets, 'cron', hour=8, minute=30, args=[global_syncer])
+        scheduler.add_job(job_monday, 'cron', hour=8, minute=45, args=[global_syncer])
+        scheduler.add_job(message_after_job, 'cron', hour=9, minute=15, args=[global_syncer])
         scheduler.add_job(
             job_per_hour,
             'cron',

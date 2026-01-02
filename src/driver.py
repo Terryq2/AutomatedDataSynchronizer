@@ -461,12 +461,15 @@ class DataSyncClient:
         
 
         timestamp_col_name = self._get_primary_timestamp_column_name('C18')
-        list_of_ids_to_delete.extend(self.lark_client.get_table_records_id_at_dates(compose_table_name(self.config.get_name('C18')),
-                                                                                    list_of_days,
-                                                                                    accuracy=self.config.get_accuracy('C18'),
-                                                                                    time_stamp_column_name=timestamp_col_name,
-                                                                                    column_to_reverse_by=timestamp_col_name))
-        self.lark_client.delete_records_by_id(compose_table_name(self.config.get_name('C18')), list_of_ids_to_delete)
+        table_id, wiki_obj_token = self.lark_client._initialize_request(compose_table_name(self.config.get_name('C18')), None)
+        if table_id is not None:
+            list_of_ids_to_delete.extend(self.lark_client.get_table_records_id_at_dates(compose_table_name(self.config.get_name('C18')),
+                                                                                        list_of_days,
+                                                                                        accuracy=self.config.get_accuracy('C18'),
+                                                                                        time_stamp_column_name=timestamp_col_name,
+                                                                                        column_to_reverse_by=timestamp_col_name))
+        if list_of_ids_to_delete:
+            self.lark_client.delete_records_by_id(compose_table_name(self.config.get_name('C18')), list_of_ids_to_delete)
         self.upload_data(FinancialQueries('C18', 'day', yesterday), compose_table_name(self.config.get_name('C18')))
         self.upload_future_data('C18', compose_table_name(self.config.get_name('C18')))
 
